@@ -1,38 +1,675 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My First GitHub Page</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #0d1117, #161b22);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            color: #e6edf3;
-        }
-        .card {
-            text-align: center;
-            padding: 3rem 4rem;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 16px;
-            backdrop-filter: blur(10px);
-        }
-        h1 { font-size: 2.5rem; margin-bottom: 1rem; }
-        p { font-size: 1.2rem; color: #8b949e; }
-        .emoji { font-size: 4rem; margin-bottom: 1.5rem; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>两相交错非同步 Boost 输出纹波计算器</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #171717;
+    --text-secondary: #4d4d4d;
+    --text-muted: #666666;
+    --text-placeholder: #808080;
+    --surface: #ffffff;
+    --surface-tint: #fafafa;
+    --gray-100: #ebebeb;
+    --border-shadow: rgba(0,0,0,0.08) 0px 0px 0px 1px;
+    --card-shadow: rgba(0,0,0,0.08) 0px 0px 0px 1px, rgba(0,0,0,0.04) 0px 2px 2px, rgba(0,0,0,0.04) 0px 8px 8px -8px, #fafafa 0px 0px 0px 1px;
+    --focus: hsla(212, 100%, 48%, 1);
+    --blue: #0070f3;
+    --pink: #de1d8d;
+    --red: #ff5b4f;
+    --green: #2ecc71;
+    --orange: #f39c12;
+    --font: 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    font-size: 14px; min-height: 100vh; -webkit-font-smoothing: antialiased;
+  }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 32px 40px; }
+
+  /* Header */
+  .header { margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--text); }
+  .header h1 {
+    font-size: 28px; font-weight: 600; letter-spacing: -1.12px;
+    line-height: 1.3; margin-bottom: 8px;
+  }
+  .header .subtitle {
+    font-size: 13px; color: var(--text-secondary); font-weight: 400;
+    font-family: var(--mono); font-feature-settings: "liga";
+  }
+
+  /* Top section */
+  .top-section {
+    display: grid; grid-template-columns: 340px 1fr; gap: 24px; margin-bottom: 32px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface); box-shadow: var(--card-shadow);
+    border-radius: 8px; padding: 20px; overflow: hidden;
+  }
+
+  .card-title {
+    font-size: 11px; font-weight: 500; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 20px; font-family: var(--mono);
+  }
+
+  /* Mode toggle */
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .card-header .card-title { margin-bottom: 0; }
+  .toggle-wrap {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text-muted); font-family: var(--mono);
+  }
+  .toggle-switch {
+    position: relative; width: 36px; height: 20px; cursor: pointer;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0; background: var(--gray-100);
+    border-radius: 20px; transition: background 0.2s;
+    box-shadow: var(--border-shadow);
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute; left: 2px; top: 2px;
+    width: 16px; height: 16px; background: #fff; border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: rgba(0,0,0,0.12) 0px 1px 2px;
+  }
+  .toggle-switch input:checked + .toggle-slider { background: var(--blue); }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+  /* Slider mode */
+  .slider-field { display: flex; flex-direction: column; min-width: 0; }
+  .slider-field .slider-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .slider-field .slider-header label {
+    font-size: 12px; color: var(--text-secondary); font-weight: 400;
+  }
+  .slider-field .slider-header label code {
+    color: var(--blue); font-family: var(--mono); font-size: 11px;
+    background: rgba(0,112,243,0.06); padding: 1px 5px; border-radius: 3px;
+    font-weight: 500;
+  }
+  .slider-field .slider-val {
+    font-size: 12px; font-family: var(--mono); font-weight: 500; color: var(--text);
+    min-width: 52px; text-align: right;
+  }
+  .slider-field input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
+    background: var(--gray-100); border-radius: 2px; outline: none;
+    cursor: pointer;
+  }
+  .slider-field input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; background: var(--text); border-radius: 50%;
+    box-shadow: rgba(0,0,0,0.15) 0px 1px 3px;
+    transition: box-shadow 0.15s;
+  }
+  .slider-field input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 4px rgba(0,112,243,0.15), rgba(0,0,0,0.15) 0px 1px 3px;
+  }
+  .slider-field input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px; background: var(--text); border: none; border-radius: 50%;
+    box-shadow: rgba(0,0,0,0.15) 0px 1px 3px; cursor: pointer;
+  }
+  .slider-grid { display: flex; flex-direction: column; gap: 10px; }
+
+  /* Hide/show layers */
+  .input-mode .slider-layer { display: none; }
+  .slider-mode .input-layer { display: none; }
+
+  /* Parameter inputs */
+  .param-group { margin-bottom: 20px; }
+  .param-group:last-of-type { margin-bottom: 16px; }
+  .param-group-title {
+    font-size: 11px; color: var(--text-placeholder); text-transform: uppercase;
+    letter-spacing: 0.8px; margin-bottom: 10px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--gray-100); font-family: var(--mono);
+  }
+  .param-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px 10px;
+  }
+  .param-field { display: flex; flex-direction: column; min-width: 0; }
+  .param-field label {
+    font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;
+    font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .param-field label code {
+    color: var(--blue); font-family: var(--mono); font-size: 11px;
+    background: rgba(0,112,243,0.06); padding: 1px 5px; border-radius: 3px;
+    font-weight: 500;
+  }
+  .param-field input {
+    background: var(--bg); box-shadow: var(--border-shadow);
+    border: none; border-radius: 6px;
+    color: var(--text); padding: 7px 10px; font-size: 13px;
+    font-family: var(--mono); outline: none; transition: box-shadow 0.15s;
+    font-feature-settings: "liga"; width: 100%; min-width: 0;
+  }
+  .param-field input:focus {
+    box-shadow: 0 0 0 2px var(--focus), var(--border-shadow);
+  }
+
+  /* Button */
+  .btn {
+    width: 100%; padding: 9px 16px; border: none; border-radius: 6px;
+    cursor: pointer; font-size: 14px; font-weight: 500;
+    font-family: var(--font); transition: all 0.15s; margin-top: 4px;
+  }
+  .btn-primary { background: var(--text); color: #ffffff; }
+  .btn-primary:hover { background: #333333; }
+
+  /* Results area */
+  .results-area { display: flex; flex-direction: column; gap: 16px; }
+
+  /* Metric cards — top row */
+  .metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .metric-card {
+    background: var(--surface); box-shadow: var(--card-shadow);
+    border-radius: 8px; padding: 16px 12px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .metric-card .m-label {
+    font-size: 11px; color: var(--text-muted); margin-bottom: 8px;
+    font-family: var(--mono); font-weight: 500; letter-spacing: 0.2px;
+  }
+  .metric-card .m-value {
+    font-size: 26px; font-weight: 600; font-family: var(--mono);
+    letter-spacing: -0.8px; line-height: 1.1;
+  }
+  .metric-card .m-unit {
+    font-size: 11px; color: var(--text-placeholder); margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  /* Status row — phase + input current */
+  .status-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+  }
+  .status-pill {
+    background: var(--surface); box-shadow: var(--card-shadow);
+    border-radius: 8px; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: var(--mono); font-size: 13px; font-weight: 500;
+    text-align: center; line-height: 1.4;
+  }
+  .status-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-pill .phase-text { color: var(--text); }
+  .status-pill .phase-mode { font-weight: 600; }
+  .status-pill .phase-pct { color: var(--text-muted); font-size: 12px; }
+  .status-pill.ccm .dot { background: var(--green); }
+  .status-pill.dcm .dot { background: var(--orange); }
+  .status-pill.ccm .phase-mode { color: var(--green); }
+  .status-pill.dcm .phase-mode { color: var(--orange); }
+
+  /* Input current card */
+  .current-card {
+    background: var(--surface); box-shadow: var(--card-shadow);
+    border-radius: 8px; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    font-family: var(--mono);
+  }
+  .current-card .c-label {
+    font-size: 11px; color: var(--text-muted); font-weight: 500;
+  }
+  .current-card .c-value {
+    font-size: 18px; font-weight: 600; color: var(--green); letter-spacing: -0.5px;
+  }
+  .current-card .c-unit {
+    font-size: 11px; color: var(--text-muted);
+  }
+
+  /* Detail grid */
+  .detail-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap: 6px;
+  }
+  .detail-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface-tint); border-radius: 6px; padding: 7px 10px;
+    box-shadow: var(--border-shadow);
+  }
+  .detail-row .d-label {
+    font-size: 11px; color: var(--text-muted); font-family: var(--mono);
+  }
+  .detail-row .d-value {
+    font-size: 12px; font-family: var(--mono); font-weight: 500; color: var(--text);
+  }
+
+  /* Charts section */
+  .charts-section {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  }
+  .chart-card {
+    background: var(--surface); box-shadow: var(--card-shadow);
+    border-radius: 8px; padding: 20px;
+  }
+  .chart-card.wide { grid-column: 1 / -1; }
+  .chart-title {
+    font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 16px;
+    letter-spacing: -0.2px;
+  }
+  .chart-container { position: relative; height: 260px; }
+  .chart-container.tall { height: 300px; }
+
+  /* Responsive */
+  @media (max-width:1100px) {
+    .top-section { grid-template-columns: 1fr; }
+    .charts-section { grid-template-columns: 1fr; }
+    .container { padding: 20px 16px; }
+    .metric-row, .status-row { grid-template-columns: 1fr; }
+  }
+</style>
 </head>
 <body>
-    <div class="card">
-        <div class="emoji">🚀</div>
-        <h1>Hello, GitHub Pages!</h1>
-        <p>托管成功 — 这是一个纯 HTML 页面</p>
+<div class="container">
+  <div class="header">
+    <h1>两相交错非同步 Boost 输出纹波计算器</h1>
+    <p class="subtitle">Time-domain Simulation · CCM/DCM Auto · Current Sharing · 180° Interleaved</p>
+  </div>
+
+  <div class="top-section">
+    <!-- Parameters -->
+    <div class="card input-mode" id="paramCard">
+      <div class="card-header">
+        <div class="card-title">Parameters</div>
+        <div class="toggle-wrap">
+          <span>Slider</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="modeToggle" onchange="toggleMode()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- INPUT MODE (number fields) -->
+      <div class="input-layer">
+        <div class="param-group">
+          <div class="param-group-title">基础参数</div>
+          <div class="param-grid">
+            <div class="param-field"><label><code>V_in</code> 输入电压 (V)</label><input id="Vin" type="number" value="12" step="0.1"></div>
+            <div class="param-field"><label><code>V_out</code> 输出电压 (V)</label><input id="Vout" type="number" value="24" step="0.1"></div>
+            <div class="param-field"><label><code>I_out</code> 输出电流 (A)</label><input id="Iout" type="number" value="3" step="0.1"></div>
+            <div class="param-field"><label><code>f_sw</code> 频率 (kHz)</label><input id="fsw" type="number" value="300" step="10"></div>
+            <div class="param-field"><label><code>η</code> 效率</label><input id="eta" type="number" value="0.92" step="0.01" min="0.5" max="1"></div>
+          </div>
+        </div>
+        <div class="param-group">
+          <div class="param-group-title">硬件参数</div>
+          <div class="param-grid">
+            <div class="param-field"><label><code>L</code> 电感 (µH)</label><input id="L" type="number" value="10" step="0.1"></div>
+            <div class="param-field"><label><code>C_out</code> 电容 (µF)</label><input id="Cout" type="number" value="47" step="1"></div>
+            <div class="param-field"><label><code>ESR</code> (mΩ)</label><input id="ESR" type="number" value="15" step="1"></div>
+            <div class="param-field"><label><code>V_d</code> 二极管 (V)</label><input id="Vd" type="number" value="0.5" step="0.05"></div>
+          </div>
+        </div>
+        <div class="param-group">
+          <div class="param-group-title">不均流</div>
+          <div class="param-grid">
+            <div class="param-field"><label><code>α</code> 主相比例</label><input id="alpha" type="number" value="0.5" step="0.01" min="0.3" max="0.7"></div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="calculate()">▶ 计算纹波</button>
+      </div>
+
+      <!-- SLIDER MODE -->
+      <div class="slider-layer">
+        <div class="slider-grid" id="sliderGrid"></div>
+      </div>
     </div>
+
+    <!-- Results -->
+    <div class="results-area">
+      <!-- Metric cards -->
+      <div class="metric-row">
+        <div class="metric-card">
+          <div class="m-label">V<sub>p-p</sub> 总纹波</div>
+          <div class="m-value" id="rVpp" style="color:var(--text)">—</div>
+          <div class="m-unit">mV</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-label">V<sub>C(p-p)</sub> 电容</div>
+          <div class="m-value" id="rVc" style="color:var(--blue)">—</div>
+          <div class="m-unit">mV</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-label">V<sub>ESR(p-p)</sub></div>
+          <div class="m-value" id="rVesr" style="color:var(--pink)">—</div>
+          <div class="m-unit">mV</div>
+        </div>
+      </div>
+
+      <!-- Status row: phase pills + input current -->
+      <div class="status-row">
+        <div class="status-pill ccm" id="rMode1">
+          <span class="dot"></span>
+          <span class="phase-text">Phase 1: <span class="phase-mode">—</span></span>
+          <span class="phase-pct" id="rPct1"></span>
+        </div>
+        <div class="status-pill ccm" id="rMode2">
+          <span class="dot"></span>
+          <span class="phase-text">Phase 2: <span class="phase-mode">—</span></span>
+          <span class="phase-pct" id="rPct2"></span>
+        </div>
+        <div class="current-card">
+          <span class="c-label">I<sub>in</sub></span>
+          <span class="c-value" id="rIin">—</span>
+          <span class="c-unit">A</span>
+        </div>
+      </div>
+
+      <!-- Detail parameters -->
+      <div class="card" style="flex:1">
+        <div class="card-title">详细参数</div>
+        <div class="detail-grid" id="detailGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-section">
+    <div class="chart-card">
+      <div class="chart-title">① 电流时域交错波形</div>
+      <div class="chart-container tall"><canvas id="chart1"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">② 电压纹波分量拆解</div>
+      <div class="chart-container tall"><canvas id="chart2"></canvas></div>
+    </div>
+    <div class="chart-card wide">
+      <div class="chart-title">③ 总输出电压纹波 V<sub>ripple</sub>(t)</div>
+      <div class="chart-container"><canvas id="chart3"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const N = 2000;
+let c1, c2, c3;
+let isSliderMode = false;
+
+// === Slider config: [id, label, unit, min, max, step, decimals] ===
+const SLIDER_DEFS = [
+  { id:'Vin',  label:'V_in',  unit:'V',   calc: v => ({min: Math.max(1, v*0.5), max: Math.min(60, v*1.5), step: 0.1, dec: 1}) },
+  { id:'Vout', label:'V_out', unit:'V',   calc: v => ({min: Math.max(3, v*0.5), max: Math.min(60, v*1.5), step: 0.1, dec: 1}) },
+  { id:'Iout', label:'I_out', unit:'A',   calc: v => ({min: 0.1, max: Math.max(v*2, 6), step: 0.1, dec: 1}) },
+  { id:'fsw',  label:'f_sw',  unit:'kHz', calc: v => ({min: Math.max(50, v*0.5), max: Math.min(2000, v*1.5), step: 10, dec: 0}) },
+  { id:'eta',  label:'η',     unit:'',    calc: () => ({min: 0.70, max: 0.99, step: 0.01, dec: 2}) },
+  { id:'L',    label:'L',     unit:'µH',  calc: v => ({min: Math.max(1, v*0.3), max: Math.min(100, v*2), step: 0.5, dec: 1}) },
+  { id:'Cout', label:'C_out', unit:'µF',  calc: v => ({min: Math.max(1, v*0.3), max: Math.min(500, v*3), step: 1, dec: 0}) },
+  { id:'ESR',  label:'ESR',   unit:'mΩ',  calc: v => ({min: Math.max(1, v*0.3), max: Math.min(200, v*3), step: 1, dec: 0}) },
+  { id:'Vd',   label:'V_d',   unit:'V',   calc: () => ({min: 0.20, max: 0.80, step: 0.01, dec: 2}) },
+  { id:'alpha',label:'α',     unit:'',    calc: () => ({min: 0.30, max: 0.70, step: 0.01, dec: 2}) },
+];
+
+function buildSliders() {
+  const grid = document.getElementById('sliderGrid');
+  grid.innerHTML = '';
+  SLIDER_DEFS.forEach(def => {
+    const input = document.getElementById(def.id);
+    const val = +input.value;
+    const r = def.calc(val);
+    const fld = document.createElement('div');
+    fld.className = 'slider-field';
+    fld.innerHTML = `
+      <div class="slider-header">
+        <label><code>${def.label}</code></label>
+        <span class="slider-val" id="sv_${def.id}">${val.toFixed(r.dec)} ${def.unit}</span>
+      </div>
+      <input type="range" id="sl_${def.id}" min="${r.min}" max="${r.max}" step="${r.step}" value="${val}">
+    `;
+    grid.appendChild(fld);
+    const sl = fld.querySelector('input[type=range]');
+    const sv = fld.querySelector('.slider-val');
+    sl.addEventListener('input', () => {
+      const v = +sl.value;
+      sv.textContent = v.toFixed(r.dec) + (def.unit ? ' ' + def.unit : '');
+      document.getElementById(def.id).value = v;
+      calculate();
+    });
+  });
+}
+
+function syncSlidersToInputs() {
+  SLIDER_DEFS.forEach(def => {
+    const sl = document.getElementById('sl_' + def.id);
+    if (sl) {
+      const v = +document.getElementById(def.id).value;
+      sl.value = v;
+      const r = def.calc(v);
+      const sv = document.getElementById('sv_' + def.id);
+      if (sv) sv.textContent = v.toFixed(r.dec) + (def.unit ? ' ' + def.unit : '');
+    }
+  });
+}
+
+function toggleMode() {
+  const card = document.getElementById('paramCard');
+  const tog = document.getElementById('modeToggle');
+  isSliderMode = tog.checked;
+  card.classList.toggle('slider-mode', isSliderMode);
+  card.classList.toggle('input-mode', !isSliderMode);
+  if (isSliderMode) {
+    buildSliders();
+    calculate();
+  }
+}
+
+function simulate(p) {
+  const { Vin, Vout, Iout, fsw, eta, L, Cout, ESR, Vd, alpha } = p;
+  const T = 1 / fsw;
+  const dt = T / N;
+  const D = 1 - (Vin * eta) / (Vout + Vd);
+  const Iin_total = (Vout * Iout) / (Vin * eta);
+  const IL1_avg = Iin_total * alpha;
+  const IL2_avg = Iin_total * (1 - alpha);
+  const dIL = (Vin * D * T) / L;
+
+  function calcPhase(Iavg, dI) {
+    const isCCM = Iavg > dI / 2;
+    let mode, Ipeak, Ivalley, Ton, Toff2;
+    if (isCCM) {
+      mode = 'CCM'; Ipeak = Iavg + dI/2; Ivalley = Iavg - dI/2;
+      Ton = D*T; Toff2 = (1-D)*T;
+    } else {
+      mode = 'DCM';
+      const k = L*(1/Vin + 1/(Vout+Vd-Vin))/T;
+      Ipeak = Math.sqrt(2*Iavg/k);
+      Ton = Ipeak*L/Vin; Toff2 = Ipeak*L/(Vout+Vd-Vin); Ivalley = 0;
+    }
+    const Id = new Float64Array(N);
+    for (let i=0; i<N; i++) {
+      const t = i*dt;
+      if (isCCM) {
+        Id[i] = t<Ton ? 0 : Ipeak - ((t-Ton)/(T-Ton))*(Ipeak-Ivalley);
+      } else {
+        if (t<Ton) Id[i]=0;
+        else if (t<Ton+Toff2) Id[i]=Ipeak*(1-(t-Ton)/Toff2);
+        else Id[i]=0;
+      }
+    }
+    return { Id, mode, Ipeak, Ivalley, Ton, Toff2 };
+  }
+
+  const ph1 = calcPhase(IL1_avg, dIL);
+  const ph2 = calcPhase(IL2_avg, dIL);
+  const shift = Math.round(N/2);
+  const Id1 = ph1.Id;
+  const Id2 = new Float64Array(N);
+  for (let i=0; i<N; i++) Id2[i] = ph2.Id[(i+shift)%N];
+
+  const Id_total = new Float64Array(N);
+  const Ic = new Float64Array(N);
+  for (let i=0; i<N; i++) { Id_total[i]=Id1[i]+Id2[i]; Ic[i]=Id_total[i]-Iout; }
+
+  const Vc = new Float64Array(N);
+  let sum = 0;
+  for (let i=0; i<N; i++) { sum+=Ic[i]*dt; Vc[i]=sum/Cout; }
+  let meanVc=0; for(let i=0;i<N;i++) meanVc+=Vc[i]; meanVc/=N;
+  for(let i=0;i<N;i++) Vc[i]-=meanVc;
+
+  const Vesr = new Float64Array(N);
+  for(let i=0;i<N;i++) Vesr[i]=Ic[i]*ESR;
+
+  const Vripple = new Float64Array(N);
+  for(let i=0;i<N;i++) Vripple[i]=Vc[i]+Vesr[i];
+
+  const pp = arr => { let mn=Infinity,mx=-Infinity; for(let v of arr){if(v<mn)mn=v;if(v>mx)mx=v;} return mx-mn; };
+
+  return {
+    t: Array.from({length:N},(_,i)=>i*dt*1e6),
+    Id1:Array.from(Id1), Id2:Array.from(Id2), Id_total:Array.from(Id_total),
+    Ic:Array.from(Ic), Vc:Array.from(Vc), Vesr:Array.from(Vesr), Vripple:Array.from(Vripple),
+    Vpp:pp(Vripple), Vc_pp:pp(Vc), Vesr_pp:pp(Vesr),
+    Iin_total, IL1_avg, IL2_avg, D, ph1, ph2,
+  };
+}
+
+const gridColor='rgba(0,0,0,0.06)', tickColor='#808080';
+
+function makeChart(canvasId, yLabel, yTickFmt) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  return new Chart(ctx, {
+    type:'line', data:{labels:[],datasets:[]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:0},
+      interaction:{mode:'index',intersect:false},
+      scales:{
+        x:{ title:{display:true,text:'时间 (µs)',color:tickColor,font:{size:11,family:'Geist Mono'}},
+            ticks:{color:tickColor,maxTicksLimit:12,font:{family:'Geist Mono',size:10}}, grid:{color:gridColor} },
+        y:{ title:{display:true,text:yLabel,color:tickColor,font:{size:11,family:'Geist Mono'}},
+            ticks:{color:tickColor,font:{family:'Geist Mono',size:10},callback:yTickFmt}, grid:{color:gridColor} }
+      },
+      plugins:{
+        legend:{ labels:{color:'#4d4d4d',font:{size:11,family:'Geist'},usePointStyle:true,pointStyle:'line',padding:16} },
+        tooltip:{ backgroundColor:'#171717',titleColor:'#fff',bodyColor:'#fff',
+          borderColor:'rgba(255,255,255,0.1)',borderWidth:1,padding:12,
+          bodyFont:{family:'Geist Mono',size:11},titleFont:{family:'Geist',size:12,weight:'500'},cornerRadius:6 }
+      }
+    }
+  });
+}
+
+function updateChart(chart, labels, datasets) {
+  chart.data.labels=labels; chart.data.datasets=datasets; chart.update();
+}
+
+function calculate() {
+  const p = {
+    Vin:+document.getElementById('Vin').value,
+    Vout:+document.getElementById('Vout').value,
+    Iout:+document.getElementById('Iout').value,
+    fsw:+document.getElementById('fsw').value*1e3,
+    eta:+document.getElementById('eta').value,
+    L:+document.getElementById('L').value*1e-6,
+    Cout:+document.getElementById('Cout').value*1e-6,
+    ESR:+document.getElementById('ESR').value*1e-3,
+    Vd:+document.getElementById('Vd').value,
+    alpha:+document.getElementById('alpha').value,
+  };
+  const r = simulate(p);
+
+  document.getElementById('rVpp').textContent = (r.Vpp*1e3).toFixed(2);
+  document.getElementById('rVc').textContent = (r.Vc_pp*1e3).toFixed(2);
+  document.getElementById('rVesr').textContent = (r.Vesr_pp*1e3).toFixed(2);
+  document.getElementById('rIin').textContent = r.Iin_total.toFixed(3);
+
+  // Phase pills
+  const m1 = document.getElementById('rMode1');
+  const m2 = document.getElementById('rMode2');
+  m1.querySelector('.phase-mode').textContent = r.ph1.mode;
+  m2.querySelector('.phase-mode').textContent = r.ph2.mode;
+  document.getElementById('rPct1').textContent = `α=${(p.alpha*100).toFixed(0)}%`;
+  document.getElementById('rPct2').textContent = `α=${((1-p.alpha)*100).toFixed(0)}%`;
+  m1.className = 'status-pill ' + (r.ph1.mode==='CCM'?'ccm':'dcm');
+  m2.className = 'status-pill ' + (r.ph2.mode==='CCM'?'ccm':'dcm');
+
+  const fmtA = v => (v*1).toFixed(3)+' A';
+  const fmtUs = v => (v*1e6).toFixed(3)+' µs';
+  const details = [
+    ['D 占空比',(r.D*100).toFixed(2)+'%'],
+    ['I_in(total)',fmtA(r.Iin_total)],
+    ['I_L1(avg)',fmtA(r.IL1_avg)],
+    ['I_L2(avg)',fmtA(r.IL2_avg)],
+    ['ΔI_L(p-p)',fmtA(p.Vin*r.D/(p.fsw*p.L))],
+    ['P1: I_peak',fmtA(r.ph1.Ipeak)],
+    ['P1: I_valley',fmtA(r.ph1.Ivalley)],
+    ['P1: T_on',fmtUs(r.ph1.Ton)],
+    ['P1: T_off2',fmtUs(r.ph1.Toff2)],
+    ['P2: I_peak',fmtA(r.ph2.Ipeak)],
+    ['P2: I_valley',fmtA(r.ph2.Ivalley)],
+    ['P2: T_on',fmtUs(r.ph2.Ton)],
+    ['P2: T_off2',fmtUs(r.ph2.Toff2)],
+  ];
+  document.getElementById('detailGrid').innerHTML = details.map(([l,v])=>
+    `<div class="detail-row"><span class="d-label">${l}</span><span class="d-value">${v}</span></div>`
+  ).join('');
+
+  const NCYCLES=5, step=4;
+  function tileRaw(arr,n){const o=[];for(let c=0;c<n;c++)for(let i=0;i<arr.length;i++)o.push(arr[i]);return o;}
+  function downsample(arr,s){const o=[];for(let i=0;i<arr.length;i+=s)o.push(arr[i]);return o;}
+
+  let meanIc=0; for(let i=0;i<N;i++)meanIc+=r.Ic[i]; meanIc/=N;
+  const Ic_dc=r.Ic.map(v=>v-meanIc);
+  const Ic_tiled=tileRaw(Ic_dc,NCYCLES), Vesr_tiled=tileRaw(r.Vesr,NCYCLES);
+  const Id1_tiled=tileRaw(r.Id1,NCYCLES), Id2_tiled=tileRaw(r.Id2,NCYCLES), Idtot_tiled=tileRaw(r.Id_total,NCYCLES);
+
+  const Nt=Ic_tiled.length, Vc_tiled=new Float64Array(Nt);
+  const dt_s=(1/p.fsw)/N;
+  let sumVc=0;
+  for(let i=0;i<Nt;i++){sumVc+=Ic_tiled[i]*dt_s;Vc_tiled[i]=sumVc/p.Cout;}
+  let meanVc=0; for(let i=0;i<Nt;i++)meanVc+=Vc_tiled[i]; meanVc/=Nt;
+  for(let i=0;i<Nt;i++)Vc_tiled[i]-=meanVc;
+
+  const Vripple_tiled=new Float64Array(Nt);
+  for(let i=0;i<Nt;i++)Vripple_tiled[i]=Vc_tiled[i]+Vesr_tiled[i];
+
+  const labels=downsample(Array.from({length:Nt},(_,i)=>(i*dt_s*1e6).toFixed(2)),step);
+  const ds_Id1=downsample(Id1_tiled,step), ds_Id2=downsample(Id2_tiled,step), ds_Idtot=downsample(Idtot_tiled,step);
+  const ds_Vc=downsample(Vc_tiled,step).map(v=>v*1e3);
+  const ds_Vesr=downsample(Vesr_tiled,step).map(v=>v*1e3);
+  const ds_Vrip=downsample(Vripple_tiled,step).map(v=>v*1e3);
+  const totalPts=labels.length;
+
+  if(!c1) c1=makeChart('chart1','电流 (A)',v=>v.toFixed(2));
+  updateChart(c1,labels,[
+    {label:'I_d1 (主相)',data:ds_Id1,borderColor:'#0070f3',borderWidth:1.5,pointRadius:0,fill:false},
+    {label:'I_d2 (辅相)',data:ds_Id2,borderColor:'#de1d8d',borderWidth:1.5,pointRadius:0,fill:false},
+    {label:'I_d(total)',data:ds_Idtot,borderColor:'#171717',borderWidth:2,pointRadius:0,fill:false},
+    {label:'I_out',data:Array(totalPts).fill(p.Iout),borderColor:'rgba(0,0,0,0.15)',borderWidth:1,borderDash:[6,4],pointRadius:0,fill:false},
+  ]);
+
+  if(!c2) c2=makeChart('chart2','电压纹波 (mV)',v=>v.toFixed(1));
+  updateChart(c2,labels,[
+    {label:'V_C',data:ds_Vc,borderColor:'#0070f3',borderWidth:1.5,pointRadius:0,fill:false},
+    {label:'V_ESR',data:ds_Vesr,borderColor:'#de1d8d',borderWidth:1.5,pointRadius:0,fill:false},
+  ]);
+
+  if(!c3) c3=makeChart('chart3','V_ripple (mV)',v=>v.toFixed(1));
+  updateChart(c3,labels,[
+    {label:'V_ripple',data:ds_Vrip,borderColor:'#171717',borderWidth:2,pointRadius:0,
+      fill:{target:'origin',above:'rgba(0,0,0,0.04)',below:'rgba(0,0,0,0.02)'}},
+  ]);
+}
+
+window.addEventListener('DOMContentLoaded',calculate);
+</script>
 </body>
 </html>
