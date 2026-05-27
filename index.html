@@ -401,9 +401,13 @@
 </div>
 
 <script>
-const N = 2000;
+const N_FULL = 2000;
+const N_FAST = 400;
+let N = N_FULL;
 let c1, c2, c3;
 let isSliderMode = false;
+let _rafPending = false;
+let _isDragging = false;
 
 // === Slider config: [id, label, unit, min, max, step, decimals] ===
 const SLIDER_DEFS = [
@@ -439,9 +443,19 @@ function buildSliders() {
     const sl = fld.querySelector('input[type=range]');
     const sv = fld.querySelector('.slider-val');
     sl.addEventListener('input', () => {
+      _isDragging = true;
       const v = +sl.value;
       sv.textContent = v.toFixed(r.dec) + (def.unit ? ' ' + def.unit : '');
       document.getElementById(def.id).value = v;
+      N = N_FAST;
+      if (!_rafPending) {
+        _rafPending = true;
+        requestAnimationFrame(() => { _rafPending = false; calculate(); });
+      }
+    });
+    sl.addEventListener('change', () => {
+      _isDragging = false;
+      N = N_FULL;
       calculate();
     });
   });
@@ -568,7 +582,8 @@ function makeChart(canvasId, yLabel, yTickFmt) {
 }
 
 function updateChart(chart, labels, datasets) {
-  chart.data.labels=labels; chart.data.datasets=datasets; chart.update();
+  chart.data.labels=labels; chart.data.datasets=datasets;
+  chart.update(_isDragging ? 'none' : undefined);
 }
 
 function calculate() {
@@ -622,7 +637,7 @@ function calculate() {
     `<div class="detail-row"><span class="d-label">${l}</span><span class="d-value">${v}</span></div>`
   ).join('');
 
-  const NCYCLES=5, step=4;
+  const NCYCLES=5, step=2;
   function tileRaw(arr,n){const o=[];for(let c=0;c<n;c++)for(let i=0;i<arr.length;i++)o.push(arr[i]);return o;}
   function downsample(arr,s){const o=[];for(let i=0;i<arr.length;i+=s)o.push(arr[i]);return o;}
 
@@ -650,21 +665,21 @@ function calculate() {
 
   if(!c1) c1=makeChart('chart1','电流 (A)',v=>v.toFixed(2));
   updateChart(c1,labels,[
-    {label:'I_d1 (主相)',data:ds_Id1,borderColor:'#0070f3',borderWidth:1.5,pointRadius:0,fill:false},
-    {label:'I_d2 (辅相)',data:ds_Id2,borderColor:'#de1d8d',borderWidth:1.5,pointRadius:0,fill:false},
-    {label:'I_d(total)',data:ds_Idtot,borderColor:'#171717',borderWidth:2,pointRadius:0,fill:false},
-    {label:'I_out',data:Array(totalPts).fill(p.Iout),borderColor:'rgba(0,0,0,0.15)',borderWidth:1,borderDash:[6,4],pointRadius:0,fill:false},
+    {label:'I_d1 (主相)',data:ds_Id1,borderColor:'#0070f3',borderWidth:1.5,pointRadius:0,fill:false,tension:0.3},
+    {label:'I_d2 (辅相)',data:ds_Id2,borderColor:'#de1d8d',borderWidth:1.5,pointRadius:0,fill:false,tension:0.3},
+    {label:'I_d(total)',data:ds_Idtot,borderColor:'#171717',borderWidth:2,pointRadius:0,fill:false,tension:0.3},
+    {label:'I_out',data:Array(totalPts).fill(p.Iout),borderColor:'rgba(0,0,0,0.15)',borderWidth:1,borderDash:[6,4],pointRadius:0,fill:false,tension:0},
   ]);
 
   if(!c2) c2=makeChart('chart2','电压纹波 (mV)',v=>v.toFixed(1));
   updateChart(c2,labels,[
-    {label:'V_C',data:ds_Vc,borderColor:'#0070f3',borderWidth:1.5,pointRadius:0,fill:false},
-    {label:'V_ESR',data:ds_Vesr,borderColor:'#de1d8d',borderWidth:1.5,pointRadius:0,fill:false},
+    {label:'V_C',data:ds_Vc,borderColor:'#0070f3',borderWidth:1.5,pointRadius:0,fill:false,tension:0.3},
+    {label:'V_ESR',data:ds_Vesr,borderColor:'#de1d8d',borderWidth:1.5,pointRadius:0,fill:false,tension:0.3},
   ]);
 
   if(!c3) c3=makeChart('chart3','V_ripple (mV)',v=>v.toFixed(1));
   updateChart(c3,labels,[
-    {label:'V_ripple',data:ds_Vrip,borderColor:'#171717',borderWidth:2,pointRadius:0,
+    {label:'V_ripple',data:ds_Vrip,borderColor:'#171717',borderWidth:2,pointRadius:0,tension:0.3,
       fill:{target:'origin',above:'rgba(0,0,0,0.04)',below:'rgba(0,0,0,0.02)'}},
   ]);
 }
