@@ -531,7 +531,10 @@ function simulate(p) {
 
   const Id_total = new Float64Array(N);
   const Ic = new Float64Array(N);
-  for (let i=0; i<N; i++) { Id_total[i]=Id1[i]+Id2[i]; Ic[i]=Id_total[i]-Iout; }
+  for (let i=0; i<N; i++) { Id_total[i]=Id1[i]+Id2[i]; }
+  // 使用实际平均二极管电流代替 Iout，避免直流偏差积分后逐周期漂移
+  let I_d_avg = 0; for(let i=0;i<N;i++) I_d_avg += Id_total[i]; I_d_avg /= N;
+  for (let i=0; i<N; i++) Ic[i] = Id_total[i] - I_d_avg;
 
   const Vc = new Float64Array(N);
   let sum = 0;
@@ -642,6 +645,7 @@ function calculate() {
   function downsample(arr,s){const o=[];for(let i=0;i<arr.length;i+=s)o.push(arr[i]);return o;}
 
   let meanIc=0; for(let i=0;i<N;i++)meanIc+=r.Ic[i]; meanIc/=N;
+  // 单周期 Ic 已经用 I_d_avg 去直流，这里再减一次均值确保精度
   const Ic_dc=r.Ic.map(v=>v-meanIc);
   const Ic_tiled=tileRaw(Ic_dc,NCYCLES), Vesr_tiled=tileRaw(r.Vesr,NCYCLES);
   const Id1_tiled=tileRaw(r.Id1,NCYCLES), Id2_tiled=tileRaw(r.Id2,NCYCLES), Idtot_tiled=tileRaw(r.Id_total,NCYCLES);
